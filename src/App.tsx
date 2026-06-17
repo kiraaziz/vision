@@ -7,7 +7,7 @@ const MIDDLE_TIP = 12
 const RING_TIP   = 16
 const PINKY_TIP  = 20
 
-const CONNECTIONS = [
+const CONNECTIONS: [number, number][] = [
   [0,1],[1,2],[2,3],[3,4],
   [0,5],[5,6],[6,7],[7,8],
   [5,9],[9,10],[10,11],[11,12],
@@ -16,7 +16,13 @@ const CONNECTIONS = [
   [0,17],
 ]
 
-const FILTERS = [
+interface Filter {
+  id: string
+  label: string
+  css: string
+}
+
+const FILTERS: Filter[] = [
   { id:"thermal",    label:"Thermal",    css:"invert(1) sepia(1) saturate(10) hue-rotate(295deg) contrast(1.5)" },
   { id:"acid",       label:"Acid",       css:"hue-rotate(90deg) saturate(20) contrast(3) brightness(0.6)" },
   { id:"void",       label:"Void",       css:"invert(1) contrast(8) brightness(0.4) grayscale(1)" },
@@ -49,10 +55,23 @@ const FILTERS = [
   { id:"obliterate", label:"Obliterate", css:"contrast(30) saturate(50) hue-rotate(180deg) brightness(0.2) invert(0.8)" },
 ]
 
-const SHAPE_COLORS = ["#ff4dac","#4dffa3","#4db8ff","#ffe14d","#ff6b4d","#c44dff"]
+const SHAPE_COLORS: string[] = ["#ff4dac","#4dffa3","#4db8ff","#ffe14d","#ff6b4d","#c44dff"]
 let _id = 0
 
-function newShape() {
+interface Slot {
+  hand: number
+  finger: number
+}
+
+interface Shape {
+  id: number
+  label: string
+  color: string
+  slots: Slot[]
+  filter: string
+}
+
+function newShape(): Shape {
   _id++
   return {
     id: _id,
@@ -68,32 +87,57 @@ function newShape() {
   }
 }
 
-function sortByAngle(pts) {
-  const cx = pts.reduce((s,p)=>s+p.x,0)/pts.length
-  const cy = pts.reduce((s,p)=>s+p.y,0)/pts.length
-  return [...pts].sort((a,b)=>
-    Math.atan2(a.y-cy,a.x-cx) - Math.atan2(b.y-cy,b.x-cx)
+interface Point {
+  x: number
+  y: number
+}
+
+function sortByAngle(pts: Point[]): Point[] {
+  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length
+  const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length
+  return [...pts].sort((a, b) =>
+    Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx)
   )
 }
 
-// ── Mini hand picker ──────────────────────────────────────────────
-const HAND_TIPS = [
+interface HandTipDef {
+  id: number
+  cx: number
+  cy: number
+  short: string
+}
+
+interface HandKnuckleDef {
+  id: number
+  cx: number
+  cy: number
+}
+
+const HAND_TIPS: HandTipDef[] = [
   { id:THUMB_TIP,  cx:18, cy:62, short:"T" },
   { id:INDEX_TIP,  cx:34, cy:18, short:"I" },
   { id:MIDDLE_TIP, cx:50, cy:10, short:"M" },
   { id:RING_TIP,   cx:66, cy:18, short:"R" },
   { id:PINKY_TIP,  cx:80, cy:32, short:"P" },
 ]
-const HAND_KNUCKLES = [
+
+const HAND_KNUCKLES: HandKnuckleDef[] = [
   { id:THUMB_TIP,  cx:28, cy:72 },
   { id:INDEX_TIP,  cx:36, cy:52 },
   { id:MIDDLE_TIP, cx:50, cy:48 },
   { id:RING_TIP,   cx:64, cy:52 },
   { id:PINKY_TIP,  cx:76, cy:58 },
 ]
+
 const PALM = "M28,72 L36,52 L50,48 L64,52 L76,58 L80,78 L60,88 L40,88 Z"
 
-function MiniHand({ handIdx, selectedFingers, onToggle }) {
+interface MiniHandProps {
+  handIdx: number
+  selectedFingers: number[]
+  onToggle: (fingerId: number) => void
+}
+
+function MiniHand({ handIdx, selectedFingers, onToggle }: MiniHandProps) {
   return (
     <div style={{textAlign:"center"}}>
       <div style={{fontSize:10,color:"#666",marginBottom:3,fontFamily:"monospace"}}>
@@ -101,15 +145,15 @@ function MiniHand({ handIdx, selectedFingers, onToggle }) {
       </div>
       <svg viewBox="0 0 100 96" width={84} height={80}>
         <path d={PALM} fill="#1a1a2e" stroke="#333" strokeWidth={1.5}/>
-        {HAND_TIPS.map((t,i)=>{
+        {HAND_TIPS.map((t, i) => {
           const k = HAND_KNUCKLES[i]
           return <line key={t.id} x1={k.cx} y1={k.cy} x2={t.cx} y2={t.cy}
             stroke="#2a2a3e" strokeWidth={8} strokeLinecap="round"/>
         })}
-        {HAND_TIPS.map(t=>{
+        {HAND_TIPS.map(t => {
           const on = selectedFingers.includes(t.id)
           return (
-            <g key={t.id} style={{cursor:"pointer"}} onClick={()=>onToggle(t.id)}>
+            <g key={t.id} style={{cursor:"pointer"}} onClick={() => onToggle(t.id)}>
               <circle cx={t.cx} cy={t.cy} r={10}
                 fill={on?"#4dffa3":"#1e1e2e"}
                 stroke={on?"#4dffa3":"#444"} strokeWidth={1.5}/>
@@ -126,15 +170,19 @@ function MiniHand({ handIdx, selectedFingers, onToggle }) {
   )
 }
 
-// ── Filter preview ────────────────────────────────────────────────
-function FilterPicker({ value, onChange }) {
+interface FilterPickerProps {
+  value: string
+  onChange: (filterId: string) => void
+}
+
+function FilterPicker({ value, onChange }: FilterPickerProps) {
   return (
     <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4,
       scrollbarWidth:"thin",scrollbarColor:"#333 transparent"}}>
-      {FILTERS.map(f=>{
+      {FILTERS.map(f => {
         const sel = value===f.id
         return (
-          <div key={f.id} onClick={()=>onChange(f.id)} style={{
+          <div key={f.id} onClick={() => onChange(f.id)} style={{
             cursor:"pointer",flexShrink:0,width:68,
             border:`2px solid ${sel?"#4dffa3":"#2a2a3e"}`,
             borderRadius:7,overflow:"hidden",background:"#0e0e1a",
@@ -155,35 +203,39 @@ function FilterPicker({ value, onChange }) {
   )
 }
 
-// ── Shape card ────────────────────────────────────────────────────
-function ShapeCard({ shape, onChange, onDelete }) {
-  const [tab, setTab] = useState("fingers")
+interface ShapeCardProps {
+  shape: Shape
+  onChange: (updated: Shape) => void
+  onDelete: () => void
+}
 
-  const toggleFinger = (handIdx, fingerId) => {
-    const exists = shape.slots.findIndex(s=>s.hand===handIdx&&s.finger===fingerId)
-    let slots
+function ShapeCard({ shape, onChange, onDelete }: ShapeCardProps) {
+  const [tab, setTab] = useState<"fingers" | "filter">("fingers")
+
+  const toggleFinger = (handIdx: number, fingerId: number): void => {
+    const exists = shape.slots.findIndex(s => s.hand===handIdx && s.finger===fingerId)
+    let slots: Slot[]
     if (exists >= 0) {
-      slots = shape.slots.filter((_,i)=>i!==exists)
+      slots = shape.slots.filter((_, i) => i !== exists)
     } else {
       if (shape.slots.length >= 4) return
-      slots = [...shape.slots, {hand:handIdx, finger:fingerId}]
+      slots = [...shape.slots, {hand: handIdx, finger: fingerId}]
     }
     onChange({...shape, slots})
   }
 
-  const h0 = shape.slots.filter(s=>s.hand===0).map(s=>s.finger)
-  const h1 = shape.slots.filter(s=>s.hand===1).map(s=>s.finger)
+  const h0 = shape.slots.filter(s => s.hand===0).map(s => s.finger)
+  const h1 = shape.slots.filter(s => s.hand===1).map(s => s.finger)
 
   return (
     <div style={{background:"#0e0e1a",border:`1.5px solid ${shape.color}33`,
       borderRadius:10,marginBottom:10,overflow:"hidden"}}>
-      {/* header */}
       <div style={{display:"flex",alignItems:"center",gap:6,padding:"7px 10px",
         background:`${shape.color}14`,borderBottom:"1px solid #1a1a2e"}}>
         <div style={{width:8,height:8,borderRadius:"50%",background:shape.color}}/>
         <span style={{fontFamily:"monospace",fontSize:11,color:"#ccc",flex:1}}>{shape.label}</span>
-        {["fingers","filter"].map(t=>(
-          <button key={t} onClick={()=>setTab(t)} style={{
+        {(["fingers","filter"] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)} style={{
             fontSize:10,padding:"2px 7px",borderRadius:4,border:"none",cursor:"pointer",
             background:tab===t?"#4dffa322":"transparent",
             color:tab===t?"#4dffa3":"#555",fontFamily:"monospace",
@@ -194,7 +246,6 @@ function ShapeCard({ shape, onChange, onDelete }) {
           background:"#ff4d4d18",color:"#ff6666",fontFamily:"monospace",
         }}>✕</button>
       </div>
-      {/* fingers */}
       {tab==="fingers" && (
         <div style={{padding:"10px"}}>
           <div style={{fontSize:10,color:"#555",marginBottom:8,fontFamily:"monospace"}}>
@@ -202,9 +253,9 @@ function ShapeCard({ shape, onChange, onDelete }) {
           </div>
           <div style={{display:"flex",gap:12,justifyContent:"center"}}>
             <MiniHand handIdx={0} selectedFingers={h0}
-              onToggle={id=>toggleFinger(0,id)}/>
+              onToggle={id => toggleFinger(0, id)}/>
             <MiniHand handIdx={1} selectedFingers={h1}
-              onToggle={id=>toggleFinger(1,id)}/>
+              onToggle={id => toggleFinger(1, id)}/>
           </div>
           <div style={{marginTop:6,textAlign:"center",fontSize:10,
             color: shape.slots.length>=3?"#4dffa355":"#ff6655",fontFamily:"monospace"}}>
@@ -213,47 +264,42 @@ function ShapeCard({ shape, onChange, onDelete }) {
           </div>
         </div>
       )}
-      {/* filter */}
       {tab==="filter" && (
         <div style={{padding:"10px"}}>
           <div style={{fontSize:10,color:"#555",marginBottom:8,fontFamily:"monospace"}}>
             CSS filter applied inside the mask
           </div>
-          <FilterPicker value={shape.filter} onChange={v=>onChange({...shape,filter:v})}/>
+          <FilterPicker value={shape.filter} onChange={v => onChange({...shape, filter:v})}/>
         </div>
       )}
     </div>
   )
 }
 
-// ── Main component ────────────────────────────────────────────────
 export default function VJMaskCamera() {
-  const videoRef      = useRef(null)
-  const baseCanvasRef = useRef(null)   // shows mirrored video
-  const overlayRef    = useRef(null)   // landmarks + shape outlines
-  const containerRef  = useRef(null)
-  const landmarkerRef = useRef(null)
-  const rafRef        = useRef(null)
+  const videoRef      = useRef<HTMLVideoElement>(null)
+  const baseCanvasRef = useRef<HTMLCanvasElement>(null)
+  const overlayRef    = useRef<HTMLCanvasElement>(null)
+  const containerRef  = useRef<HTMLDivElement>(null)
+  const landmarkerRef = useRef<HandLandmarker | null>(null)
+  const rafRef        = useRef<number | null>(null)
 
-  // offscreen canvases per shape (keyed by shape id)
-  const shapeCanvases = useRef({})
+  const shapeCanvases = useRef<Record<number, HTMLCanvasElement>>({})
 
-  const [ready,      setReady]      = useState(false)
-  const [error,      setError]      = useState(null)
-  const [shapes,     setShapes]     = useState([newShape()])
-  const [editorOpen, setEditorOpen] = useState(false)
+  const [ready,      setReady]      = useState<boolean>(false)
+  const [error,      setError]      = useState<string | null>(null)
+  const [shapes,     setShapes]     = useState<Shape[]>([newShape()])
+  const [editorOpen, setEditorOpen] = useState<boolean>(false)
 
-  // keep a ref of shapes so the rAF loop always sees latest
-  const shapesRef = useRef(shapes)
-  useEffect(()=>{ shapesRef.current = shapes },[shapes])
+  const shapesRef = useRef<Shape[]>(shapes)
+  useEffect(() => { shapesRef.current = shapes }, [shapes])
 
-  // ── setup camera + mediapipe ──
-  useEffect(()=>{
-    let stream = null
-    const setup = async () => {
+  useEffect(() => {
+    let stream: MediaStream | null = null
+    const setup = async (): Promise<void> => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"user"}})
-        videoRef.current.srcObject = stream
+        if (videoRef.current) videoRef.current.srcObject = stream
 
         const vision = await FilesetResolver.forVisionTasks(
           "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
@@ -268,27 +314,26 @@ export default function VJMaskCamera() {
         })
         setReady(true)
       } catch(e) {
-        setError("Camera unavailable: "+e.message)
+        setError("Camera unavailable: " + (e as Error).message)
       }
     }
     setup()
-    return ()=>{
-      stream?.getTracks().forEach(t=>t.stop())
-      if(rafRef.current) cancelAnimationFrame(rafRef.current)
+    return () => {
+      stream?.getTracks().forEach(t => t.stop())
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
       landmarkerRef.current?.close()
     }
-  },[])
+  }, [])
 
-  // ── main render loop ──
-  useEffect(()=>{
-    if(!ready) return
+  useEffect(() => {
+    if (!ready) return
 
-    const loop = () => {
-      const video     = videoRef.current
-      const baseCtx   = baseCanvasRef.current?.getContext("2d")
-      const overlayCtx= overlayRef.current?.getContext("2d")
-      const container = containerRef.current
-      const detector  = landmarkerRef.current
+    const loop = (): void => {
+      const video      = videoRef.current
+      const baseCtx    = baseCanvasRef.current?.getContext("2d")
+      const overlayCtx = overlayRef.current?.getContext("2d")
+      const container  = containerRef.current
+      const detector   = landmarkerRef.current
 
       if (!video || !baseCtx || !overlayCtx || !container || !detector
           || video.readyState < 2) {
@@ -299,13 +344,12 @@ export default function VJMaskCamera() {
       const W = container.clientWidth
       const H = container.clientHeight
 
-      // resize canvases if needed
-      ;[baseCanvasRef, overlayRef].forEach(r=>{
-        if(r.current.width!==W)  r.current.width  = W
-        if(r.current.height!==H) r.current.height = H
+      ;([baseCanvasRef, overlayRef] as React.RefObject<HTMLCanvasElement>[]).forEach(r => {
+        if (!r.current) return
+        if (r.current.width  !== W) r.current.width  = W
+        if (r.current.height !== H) r.current.height = H
       })
 
-      // cover-fit: scale video to fill canvas without stretching
       const vw = video.videoWidth  || W
       const vh = video.videoHeight || H
       const scale = Math.max(W/vw, H/vh)
@@ -314,8 +358,7 @@ export default function VJMaskCamera() {
       const dx = (W - dw) / 2
       const dy = (H - dh) / 2
 
-      // helper: draw video cover-fit mirrored onto a 2d context
-      const drawCoverMirrored = (ctx, filterCss) => {
+      const drawCoverMirrored = (ctx: CanvasRenderingContext2D, filterCss: string | null): void => {
         ctx.save()
         if (filterCss) ctx.filter = filterCss
         ctx.scale(-1, 1)
@@ -323,45 +366,39 @@ export default function VJMaskCamera() {
         ctx.restore()
       }
 
-      // draw mirrored base frame (cover-fit, no stretch)
       drawCoverMirrored(baseCtx, null)
 
-      // detect hands — mirror x so landmarks match the flipped canvas
       const result = detector.detectForVideo(video, performance.now())
-      const hands  = result.landmarks.map(hand =>
+      const hands: Point[][] = result.landmarks.map(hand =>
         hand.map(p => ({
-          x: (1 - p.x) * dw + dx,   // mirror + cover-fit x
-          y: p.y * dh + dy,          // cover-fit y
+          x: (1 - p.x) * dw + dx,
+          y: p.y * dh + dy,
         }))
       )
 
-      // for each shape: draw filtered region onto its offscreen canvas, then clip-paste
       const currentShapes = shapesRef.current
       currentShapes.forEach(shape => {
-        // get/create offscreen canvas
         if (!shapeCanvases.current[shape.id]) {
           shapeCanvases.current[shape.id] = document.createElement("canvas")
         }
         const oc = shapeCanvases.current[shape.id]
-        if (oc.width!==W)  oc.width  = W
-        if (oc.height!==H) oc.height = H
+        if (oc.width  !== W) oc.width  = W
+        if (oc.height !== H) oc.height = H
 
-        // compute polygon points
-        const pts = shape.slots
+        const pts: Point[] = shape.slots
           .map(s => hands[s.hand]?.[s.finger] ?? null)
-          .filter(Boolean)
+          .filter((p): p is Point => p !== null)
 
         if (pts.length < 3) return
 
         const poly = sortByAngle(pts)
 
-        // draw cover-fit mirrored filtered frame onto offscreen canvas
         const oc2d = oc.getContext("2d")
-        oc2d.clearRect(0,0,W,H)
-        const filterCss = FILTERS.find(f=>f.id===shape.filter)?.css || "invert(1)"
+        if (!oc2d) return
+        oc2d.clearRect(0, 0, W, H)
+        const filterCss = FILTERS.find(f => f.id===shape.filter)?.css ?? "invert(1)"
         drawCoverMirrored(oc2d, filterCss)
 
-        // clip to polygon and draw onto base canvas
         baseCtx.save()
         baseCtx.beginPath()
         baseCtx.moveTo(poly[0].x, poly[0].y)
@@ -372,50 +409,46 @@ export default function VJMaskCamera() {
         baseCtx.restore()
       })
 
-      // landmarks overlay
-      overlayCtx.clearRect(0,0,W,H)
-
+      overlayCtx.clearRect(0, 0, W, H)
       overlayCtx.save()
 
       hands.forEach(hand => {
         overlayCtx.strokeStyle = "rgba(0,255,100,0.5)"
         overlayCtx.lineWidth   = 1.5
-        CONNECTIONS.forEach(([a,b])=>{
-          if(!hand[a]||!hand[b]) return
+        CONNECTIONS.forEach(([a, b]) => {
+          if (!hand[a] || !hand[b]) return
           overlayCtx.beginPath()
           overlayCtx.moveTo(hand[a].x, hand[a].y)
           overlayCtx.lineTo(hand[b].x, hand[b].y)
           overlayCtx.stroke()
         })
         overlayCtx.fillStyle = "rgba(255,80,80,0.8)"
-        hand.forEach(p=>{
+        hand.forEach(p => {
           overlayCtx.beginPath()
           overlayCtx.arc(p.x, p.y, 3, 0, Math.PI*2)
           overlayCtx.fill()
         })
       })
 
-      // shape corner markers
       currentShapes.forEach(shape => {
-        const pts = shape.slots
+        const pts: Point[] = shape.slots
           .map(s => hands[s.hand]?.[s.finger] ?? null)
-          .filter(Boolean)
-        if(pts.length<3) return
+          .filter((p): p is Point => p !== null)
+        if (pts.length < 3) return
         const poly = sortByAngle(pts)
         overlayCtx.strokeStyle = shape.color
         overlayCtx.lineWidth   = 2.5
-        poly.forEach(p=>{
+        poly.forEach(p => {
           overlayCtx.beginPath()
           overlayCtx.arc(p.x, p.y, 7, 0, Math.PI*2)
           overlayCtx.stroke()
         })
-        // outline
-        overlayCtx.strokeStyle = shape.color+"88"
+        overlayCtx.strokeStyle = shape.color + "88"
         overlayCtx.lineWidth = 1.5
-        overlayCtx.setLineDash([4,4])
+        overlayCtx.setLineDash([4, 4])
         overlayCtx.beginPath()
         overlayCtx.moveTo(poly[0].x, poly[0].y)
-        poly.slice(1).forEach(p=>overlayCtx.lineTo(p.x,p.y))
+        poly.slice(1).forEach(p => overlayCtx.lineTo(p.x, p.y))
         overlayCtx.closePath()
         overlayCtx.stroke()
         overlayCtx.setLineDash([])
@@ -427,16 +460,15 @@ export default function VJMaskCamera() {
     }
 
     rafRef.current = requestAnimationFrame(loop)
-    return ()=>{ if(rafRef.current) cancelAnimationFrame(rafRef.current) }
-  },[ready])
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
+  }, [ready])
 
-  // clean up offscreen canvases for deleted shapes
-  useEffect(()=>{
-    const ids = new Set(shapes.map(s=>s.id))
-    Object.keys(shapeCanvases.current).forEach(k=>{
-      if(!ids.has(Number(k))) delete shapeCanvases.current[k]
+  useEffect(() => {
+    const ids = new Set(shapes.map(s => s.id))
+    Object.keys(shapeCanvases.current).forEach(k => {
+      if (!ids.has(Number(k))) delete shapeCanvases.current[Number(k)]
     })
-  },[shapes])
+  }, [shapes])
 
   return (
     <div ref={containerRef} style={{
@@ -451,21 +483,17 @@ export default function VJMaskCamera() {
         </div>
       )}
 
-      {/* hidden video element — source only, never displayed */}
       <video ref={videoRef} autoPlay muted playsInline
         style={{position:"absolute",width:1,height:1,opacity:0,pointerEvents:"none"}}/>
 
-      {/* single canvas that shows everything */}
       <canvas ref={baseCanvasRef} style={{
         position:"absolute",inset:0,width:"100%",height:"100%",display:"block"}}/>
 
-      {/* landmark + outline overlay */}
       <canvas ref={overlayRef} style={{
         position:"absolute",inset:0,width:"100%",height:"100%",
         display:"block",pointerEvents:"none"}}/>
 
-      {/* ── editor toggle ── */}
-      <button onClick={()=>setEditorOpen(o=>!o)} style={{
+      <button onClick={() => setEditorOpen(o => !o)} style={{
         position:"absolute",bottom:24,right:24,zIndex:100,
         width:48,height:48,borderRadius:24,
         background:editorOpen?"#4dffa3":"#12121f",
@@ -479,7 +507,7 @@ export default function VJMaskCamera() {
         {editorOpen?"×":"⊞"}
       </button>
 
-      {!editorOpen && shapes.length>0 && (
+      {!editorOpen && shapes.length > 0 && (
         <div style={{
           position:"absolute",bottom:20,right:78,zIndex:100,
           background:"#4dffa3",color:"#000",borderRadius:8,
@@ -489,7 +517,6 @@ export default function VJMaskCamera() {
         </div>
       )}
 
-      {/* ── editor panel ── */}
       {editorOpen && (
         <div style={{
           position:"absolute",top:0,right:0,bottom:0,width:300,zIndex:90,
@@ -500,7 +527,7 @@ export default function VJMaskCamera() {
             display:"flex",alignItems:"center",gap:8}}>
             <span style={{fontFamily:"monospace",fontSize:12,color:"#4dffa3",
               fontWeight:700,letterSpacing:1,flex:1}}>SHAPE EDITOR</span>
-            <button onClick={()=>setShapes(s=>[...s,newShape()])} style={{
+            <button onClick={() => setShapes(s => [...s, newShape()])} style={{
               fontSize:11,padding:"4px 10px",borderRadius:6,
               border:"1.5px solid #4dffa3",cursor:"pointer",
               background:"#4dffa311",color:"#4dffa3",fontFamily:"monospace",fontWeight:700,
@@ -515,17 +542,17 @@ export default function VJMaskCamera() {
                 No shapes.<br/>Click "+ Add" to begin.
               </div>
             )}
-            {shapes.map(sh=>(
+            {shapes.map(sh => (
               <ShapeCard key={sh.id} shape={sh}
-                onChange={updated=>setShapes(s=>s.map(x=>x.id===updated.id?updated:x))}
-                onDelete={()=>setShapes(s=>s.filter(x=>x.id!==sh.id))}/>
+                onChange={updated => setShapes(s => s.map(x => x.id===updated.id ? updated : x))}
+                onDelete={() => setShapes(s => s.filter(x => x.id!==sh.id))}/>
             ))}
           </div>
 
           <div style={{position:"absolute",bottom:0,left:0,right:0,
             padding:"10px 14px",borderTop:"1px solid #1a1a2e",
             background:"rgba(6,6,16,0.99)"}}>
-            <button onClick={()=>setEditorOpen(false)} style={{
+            <button onClick={() => setEditorOpen(false)} style={{
               width:"100%",padding:"10px",borderRadius:8,
               border:"1.5px solid #4dffa3",background:"#4dffa3",
               color:"#000",fontFamily:"monospace",fontSize:12,
